@@ -51,7 +51,7 @@ NodeJs: Backend-iot
 
 Angular: Frontend
     ```bash
-    git clone https://github.com/ndiawar/frontend.git
+    git clone https://github.com/ndiawar/kerelFrontEnd.git
     ```
 
 2. **Installer les dépendances :**
