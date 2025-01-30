@@ -46,7 +46,7 @@ Laravel: Backend-core
     ```
 NodeJs: Backend-iot
     ```bash
-    git clone https://github.com/ndiawar/kerelBackend-iot.git
+    git clone https://github.com/ndiawar/kerelBackendIot.git
     ```
 
 Angular: Frontend
