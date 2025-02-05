@@ -9,13 +9,14 @@
     "dev": "nodemon src/index.js",
     "docker:build": "docker build -t iot-api .",
     "docker:run": "docker run -p 3000:3000 --env-file .env iot-api"
-
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "^1.7.9",
     "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
@@ -23,7 +24,8 @@
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.5",
-    "pug": "^3.0.3"
+    "pug": "^3.0.3",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",
