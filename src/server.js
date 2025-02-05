@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const WebSocket = require('ws');
 const cors = require('cors');
-const axios = require('axios');
 const arrosageRoutes = require('./routes/arrosageRoutes');
+const SensorData = require('./models/SensorData');
 
 dotenv.config();
 
@@ -25,24 +25,24 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/arrosage-sy
 app.use(express.json());
 app.use(cors()); // Autoriser toutes les origines
 
-// Stockage des données (optionnel : utiliser une base de données comme MongoDB)
-let sensorData = {
-  temperature: 0,
-  humidity: 0,
-  ph: 0,
-  water_level: 0,
-};
-
 // Serveur WebSocket
 const wss = new WebSocket.Server({ port: 8080 });
 
 wss.on('connection', (ws) => {
   console.log('Nouvelle connexion WebSocket');
 
-  ws.on('message', (message) => {
-    const data = JSON.parse(message);
-    sensorData = data;
-    console.log('Données reçues :', sensorData);
+  ws.on('message', async (message) => {
+    try {
+      const data = JSON.parse(message);
+      console.log('Données reçues :', data);
+
+      // Créez une nouvelle instance de SensorData et sauvegardez-la
+      const newSensorData = new SensorData(data);
+      await newSensorData.save();
+      console.log('Données sauvegardées dans MongoDB');
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde des données :', error);
+    }
   });
 
   ws.on('close', () => {
@@ -50,9 +50,14 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Endpoint pour récupérer les données
-app.get('/api/data', (req, res) => {
-  res.json(sensorData);
+// Endpoint pour récupérer les données des capteurs
+app.get('/api/data', async (req, res) => {
+  try {
+    const data = await SensorData.find().sort({ createdAt: -1 }); // Récupérer les données, triées par date
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ message: 'Erreur lors de la récupération des données' });
+  }
 });
 
 // Endpoint pour contrôler l'arrosage
