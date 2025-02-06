@@ -4,7 +4,6 @@ const dotenv = require('dotenv');
 const WebSocket = require('ws');
 const cors = require('cors');
 const arrosageRoutes = require('./routes/arrosageRoutes');
-const SensorData = require('./models/SensorData');
 
 dotenv.config();
 
@@ -31,33 +30,25 @@ const wss = new WebSocket.Server({ port: 8080 });
 wss.on('connection', (ws) => {
   console.log('Nouvelle connexion WebSocket');
 
-  ws.on('message', async (message) => {
+  ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
       console.log('Données reçues :', data);
 
-      // Créez une nouvelle instance de SensorData et sauvegardez-la
-      const newSensorData = new SensorData(data);
-      await newSensorData.save();
-      console.log('Données sauvegardées dans MongoDB');
+      // Envoyer les données directement au client sans les sauvegarder
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(data));
+        }
+      });
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde des données :', error);
+      console.error('Erreur lors du traitement des données :', error);
     }
   });
 
   ws.on('close', () => {
     console.log('Connexion WebSocket fermée');
   });
-});
-
-// Endpoint pour récupérer les données des capteurs
-app.get('/api/data', async (req, res) => {
-  try {
-    const data = await SensorData.find().sort({ createdAt: -1 }); // Récupérer les données, triées par date
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la récupération des données' });
-  }
 });
 
 // Endpoint pour contrôler l'arrosage
