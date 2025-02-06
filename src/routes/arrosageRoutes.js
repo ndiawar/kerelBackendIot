@@ -1,17 +1,11 @@
-const express = require("express");
+import express from 'express';
+import { ajouterArrosage, getAllArrosages, updateArrosage, deleteArrosage } from '../controllers/arrosageController.js';  // Modification du chemin
+
 const router = express.Router();
-const arrosageController = require("../controllers/arrosageController");
 
-// Route pour ajouter une programmation d'arrosage
-router.post("/", arrosageController.ajouterArrosage);
+router.post("/", ajouterArrosage);
+router.get("/", getAllArrosages);
+router.put("/:id", updateArrosage);
+router.delete("/:id", deleteArrosage);
 
-// Route pour récupérer toutes les programmations
-router.get("/", arrosageController.getAllArrosages);
-
-// Route pour modifier une programmation existante
-router.put("/:id", arrosageController.updateArrosage);
-
-// Route pour supprimer une programmation
-router.delete("/:id", arrosageController.deleteArrosage);
-
-module.exports = router;
+export default router;  // Utilisation de 'export default'

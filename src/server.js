@@ -1,31 +1,25 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const dotenv = require('dotenv');
-const WebSocket = require('ws');
-const cors = require('cors');
-const arrosageRoutes = require('./routes/arrosageRoutes');
+import express from 'express';
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+import { WebSocketServer } from 'ws'; // Correct import
+import cors from 'cors';
+import arrosageRoutes from './routes/arrosageRoutes.js';
+import connectDB from './config/db.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Connexion à MongoDB
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/arrosage-system', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-  .then(() => {
-    console.log('Connecté à MongoDB');
-  })
-  .catch(err => console.error('Erreur de connexion à MongoDB:', err));
+// Connexion à la base de données
+connectDB();
 
 // Middleware pour parser le JSON
 app.use(express.json());
 app.use(cors()); // Autoriser toutes les origines
 
 // Serveur WebSocket
-const wss = new WebSocket.Server({ port: 8080 });
+const wss = new WebSocketServer({ port: 8080 });
 
 wss.on('connection', (ws) => {
   console.log('Nouvelle connexion WebSocket');
