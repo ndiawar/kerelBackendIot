@@ -1,12 +1,12 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const dotenv = require('dotenv');
-const WebSocket = require('ws');
-const cors = require('cors');
-const arrosageRoutes = require('./routes/arrosageRoutes');
-const { Client } = require('ssh2');
-const cron = require('node-cron'); // Importez node-cron
-const SensorData = require('./models/SensorData'); // Importez le modèle
+import express from 'express';
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+import cors from 'cors';
+import arrosageRoutes from './routes/arrosageRoutes.js';
+import { Client } from 'ssh2';
+import cron from 'node-cron'; // Importez node-cron
+import SensorData from './models/SensorData.js'; // Importez le modèle
+import connectDB from './config/db.js'; // Corrected import
 
 dotenv.config();
 
@@ -14,44 +14,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Connexion à MongoDB
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/arrosage-system', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-  .then(() => {
-    console.log('Connecté à MongoDB');
-  })
-  .catch(err => console.error('Erreur de connexion à MongoDB:', err));
+connectDB();
 
 // Middleware pour parser le JSON
 app.use(express.json());
 app.use(cors());
 
-// Serveur WebSocket
-const wss = new WebSocket.Server({ port: 8080 });
-
-wss.on('connection', (ws) => {
-  console.log('Nouvelle connexion WebSocket');
-
-  ws.on('message', (message) => {
-    try {
-      const data = JSON.parse(message);
-      console.log('Données reçues :', data);
-
-      wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify(data));
-        }
-      });
-    } catch (error) {
-      console.error('Erreur lors du traitement des données :', error);
-    }
-  });
-
-  ws.on('close', () => {
-    console.log('Connexion WebSocket fermée');
-  });
-});
 
 // Endpoint pour contrôler l'arrosage
 app.post('/api/water', (req, res) => {
@@ -70,39 +38,6 @@ app.post('/api/water', (req, res) => {
 // Routes pour les fonctionnalités d'arrosage
 app.use("/api/arrosage", arrosageRoutes);
 
-// Configuration de la connexion SSH
-const conn = new Client();
-const scriptPath = '/home/simplon/testarduino/testarduino.py';
-
-conn.on('ready', () => {
-  console.log('Connexion SSH établie');
-
-  // Exécutez le script Python sur le Raspberry Pi
-  conn.exec(`/home/simplon/Desktop/dht_test/myenv/bin/python3 ${scriptPath}`, (err, stream) => {
-    if (err) throw err;
-
-    stream.on('data', (data) => {
-      console.log('Données : ' + data.toString());
-
-      // Envoyer les données au client WebSocket si nécessaire
-      wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(data.toString());
-        }
-      });
-    }).stderr.on('data', (data) => {
-      console.log('Erreur : ' + data.toString());
-    }).on('close', (code, signal) => {
-      console.log('Stream terminé avec le code: ' + code);
-      conn.end();
-    });
-  });
-}).connect({
-  host: '192.168.1.35',
-  port: 22,
-  username: 'simplon',
-  password: 'simplon'
-});
 
 // Tâche cron pour récupérer les données toutes les heures
 cron.schedule('0 * * * *', () => {
