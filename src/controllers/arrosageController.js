@@ -101,20 +101,34 @@ export const updateArrosage = async (req, res) => {
     const { id } = req.params;
     const { date, typePlante, heureMatin, heureSoir, quantiteEau } = req.body;
 
+    // Vérification des données manquantes
     if (!date || !typePlante || !quantiteEau || (!heureMatin && !heureSoir)) {
       return res.status(400).json({ message: "Données manquantes" });
     }
 
-    const updatedArrosage = await Arrosage.findByIdAndUpdate(id, { date, typePlante, heureMatin, heureSoir, quantiteEau }, { new: true });
+    // Vérification de la date
+    const today = new Date().toISOString().split('T')[0];
+    if (date < today) {
+      return res.status(400).json({ message: "La date choisie est antérieure à aujourd'hui." });
+    }
+
+    const updatedArrosage = await Arrosage.findByIdAndUpdate(
+      id,
+      { date, typePlante, heureMatin, heureSoir, quantiteEau },
+      { new: true }
+    );
+
     if (!updatedArrosage) {
       return res.status(404).json({ message: "Programmation non trouvée" });
     }
+
     res.status(200).json({ message: "Programmation mise à jour", arrosage: updatedArrosage });
   } catch (error) {
     console.error("Erreur lors de la mise à jour de la programmation :", error.message || error);
     res.status(500).json({ message: "Erreur lors de la mise à jour", error: error.message });
   }
 };
+
 
 // Supprimer une programmation
 export const deleteArrosage = async (req, res) => {
