@@ -15,7 +15,5 @@ router.put("/:id", arrosageController.updateArrosage);
 // Route pour supprimer une programmation
 router.delete("/:id", arrosageController.deleteArrosage);
 
-// Route pour tester le contrôle de l'heure programmée
-router.get('/controle-heure', arrosageController.controleHeureProgrammee);
 
 export default router;

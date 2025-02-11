@@ -1,14 +1,86 @@
 import Arrosage from "../models/Arrosage.js";
+import axios from 'axios';
+import cron from 'node-cron';
+
+let pumpTimeout;
+
+// Fonction pour activer la pompe
+const activatePump = async (action) => {
+  const url = action === 'on' ? 'http://192.168.1.20:5002/pump/start' : 'http://192.168.1.20:5002/pump/stop';
+  try {
+    const response = await axios.post(url);
+    console.log(response.data.message);
+
+    if (action === 'on') {
+      // Planifier l'arrêt de la pompe après 30 secondes
+      pumpTimeout = setTimeout(async () => {
+        await activatePump('off');
+      }, 30000);
+    } else {
+      // Annuler le timeout si la pompe est arrêtée manuellement
+      if (pumpTimeout) {
+        clearTimeout(pumpTimeout);
+      }
+    }
+  } catch (error) {
+    console.error("Erreur lors de l'activation de la pompe :", error.message || error);
+  }
+};
+
+// Fonction de vérification des horaires et déclenchement de la pompe
+const checkWateringSchedules = async () => {
+  try {
+    const now = new Date();
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+    console.log(`Vérification des horaires à ${now.toLocaleTimeString()}`);
+
+    const arrosages = await Arrosage.find();
+    console.log(`${arrosages.length} programmations trouvées`);
+
+    arrosages.forEach(arrosage => {
+      console.log(`Vérification de l'arrosage ${arrosage._id}`);
+      if (!arrosage.heureMatin && !arrosage.heureSoir) {
+        console.warn("Aucun horaire défini pour l'arrosage :", arrosage._id);
+        return;
+      }
+
+      const times = [arrosage.heureMatin, arrosage.heureSoir].filter(Boolean);
+
+      times.forEach(time => {
+        const [hours, minutes] = time.split(':');
+        const scheduledTimeInMinutes = parseInt(hours) * 60 + parseInt(minutes);
+        console.log(`Horaire planifié : ${time} (${scheduledTimeInMinutes} minutes)`);
+
+        if (currentTime === scheduledTimeInMinutes) {
+          console.log(`Activation de la pompe pour l'arrosage ${arrosage._id}`);
+          activatePump('on');
+        }
+      });
+    });
+  } catch (error) {
+    console.error("Erreur lors de la récupération des programmations :", error.message || error);
+  }
+};
+
+// Planifier la vérification des horaires toutes les minutes
+cron.schedule('* * * * *', checkWateringSchedules);
+
 
 // Ajouter une nouvelle programmation d'arrosage
 export const ajouterArrosage = async (req, res) => {
   try {
     const { date, typePlante, heureMatin, heureSoir, quantiteEau } = req.body;
+
+    if (!date || !typePlante || !quantiteEau || (!heureMatin && !heureSoir)) {
+      return res.status(400).json({ message: "Données manquantes" });
+    }
+
     const nouvelArrosage = new Arrosage({ date, typePlante, heureMatin, heureSoir, quantiteEau });
     await nouvelArrosage.save();
-    res.status(201).json({ message: "Programmation d'arrosage ajoutée ", arrosage: nouvelArrosage });
+    res.status(201).json({ message: "Programmation d'arrosage ajoutée", arrosage: nouvelArrosage });
   } catch (error) {
-    res.status(500).json({ message: "Erreur lors de l'ajout ", error });
+    console.error("Erreur lors de l'ajout de la programmation :", error.message || error);
+    res.status(500).json({ message: "Erreur lors de l'ajout", error: error.message });
   }
 };
 
@@ -18,7 +90,8 @@ export const getAllArrosages = async (req, res) => {
     const arrosages = await Arrosage.find();
     res.status(200).json(arrosages);
   } catch (error) {
-    res.status(500).json({ message: "Erreur lors de la récupération ", error });
+    console.error("Erreur lors de la récupération des programmations :", error.message || error);
+    res.status(500).json({ message: "Erreur lors de la récupération", error: error.message });
   }
 };
 
@@ -26,10 +99,20 @@ export const getAllArrosages = async (req, res) => {
 export const updateArrosage = async (req, res) => {
   try {
     const { id } = req.params;
-    const updatedArrosage = await Arrosage.findByIdAndUpdate(id, req.body, { new: true });
-    res.status(200).json({ message: "Programmation mise à jour ✅", arrosage: updatedArrosage });
+    const { date, typePlante, heureMatin, heureSoir, quantiteEau } = req.body;
+
+    if (!date || !typePlante || !quantiteEau || (!heureMatin && !heureSoir)) {
+      return res.status(400).json({ message: "Données manquantes" });
+    }
+
+    const updatedArrosage = await Arrosage.findByIdAndUpdate(id, { date, typePlante, heureMatin, heureSoir, quantiteEau }, { new: true });
+    if (!updatedArrosage) {
+      return res.status(404).json({ message: "Programmation non trouvée" });
+    }
+    res.status(200).json({ message: "Programmation mise à jour", arrosage: updatedArrosage });
   } catch (error) {
-    res.status(500).json({ message: "Erreur de mise à jour ", error });
+    console.error("Erreur lors de la mise à jour de la programmation :", error.message || error);
+    res.status(500).json({ message: "Erreur lors de la mise à jour", error: error.message });
   }
 };
 
@@ -37,76 +120,19 @@ export const updateArrosage = async (req, res) => {
 export const deleteArrosage = async (req, res) => {
   try {
     const { id } = req.params;
-    await Arrosage.findByIdAndDelete(id);
-    res.status(200).json({ message: "Programmation supprimée ✅" });
+    const deletedArrosage = await Arrosage.findByIdAndDelete(id);
+    if (!deletedArrosage) {
+      return res.status(404).json({ message: "Programmation non trouvée" });
+    }
+    res.status(200).json({ message: "Programmation supprimée" });
   } catch (error) {
-    res.status(500).json({ message: "Erreur de suppression ❌", error });
+    console.error("Erreur lors de la suppression de la programmation :", error.message || error);
+    res.status(500).json({ message: "Erreur lors de la suppression", error: error.message });
   }
 };
 
-
-const controleHeureProgrammee = async (req, res) => {
-  try {
-    const now = new Date();  // Utilisation de la date locale (côté serveur)
-    const nowHours = now.getHours();  // Heure locale, sans UTC
-    const nowMinutes = now.getMinutes();
-
-    console.log(`Heure actuelle locale : ${nowHours}:${nowMinutes}`);
-
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);  // Début de la journée en heure locale
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);  // Fin de la journée en heure locale
-
-    console.log(`Début de la journée : ${startOfDay}`);
-    console.log(`Fin de la journée : ${endOfDay}`);
-
-    // Recherche des arrosages programmés pour aujourd'hui
-    const arrosagesAujourdhui = await Arrosage.find({
-      date: {
-        $gte: startOfDay,
-        $lt: endOfDay
-      }
-    });
-
-    let heureProgrammeeTrouvee = false;
-    for (const arrosage of arrosagesAujourdhui) {
-      const [heureMatinH, heureMatinM] = arrosage.heureMatin.split(':').map(Number);
-      const [heureSoirH, heureSoirM] = arrosage.heureSoir.split(':').map(Number);
-
-      console.log(`Heure programmée : Matin -> ${arrosage.heureMatin}, Soir -> ${arrosage.heureSoir}`);
-
-      if (nowHours === heureMatinH && nowMinutes === heureMatinM) {
-        console.log(`Arrosage matin pour ${arrosage.typePlante} à ${arrosage.heureMatin}`);
-        await declencherArrosage(arrosage);
-        heureProgrammeeTrouvee = true;
-      }
-
-      if (nowHours === heureSoirH && nowMinutes === heureSoirM) {
-        console.log(`Arrosage soir pour ${arrosage.typePlante} à ${arrosage.heureSoir}`);
-        await declencherArrosage(arrosage);
-        heureProgrammeeTrouvee = true;
-      }
-    }
-
-    if (!heureProgrammeeTrouvee) {
-      return res.status(200).json({ message: "Aucune heure programmée aujourd'hui." });
-    }
-
-    res.status(200).json({ message: "Vérification de l'heure programmée effectuée." });
-  } catch (error) {
-    console.error("Erreur lors du contrôle de l'heure programmée", error);
-    res.status(500).json({ message: "Erreur lors du contrôle de l'heure programmée", error });
-  }
-};
-
-
-
-// Exemple de fonction à appeler pour déclencher l'arrosage
-const declencherArrosage = (arrosage) => {
-  console.log(`Déclenchement de l'arrosage pour ${arrosage.typePlante} avec ${arrosage.quantiteEau} litres d'eau.`);
-  // Logique pour déclencher l'arrosage
-};
+// Lancer la vérification des horaires planifiés
+checkWateringSchedules();
 
 // Exportation du contrôleur complet
 export default {
@@ -114,5 +140,4 @@ export default {
   getAllArrosages,
   updateArrosage,
   deleteArrosage,
-  controleHeureProgrammee
 };

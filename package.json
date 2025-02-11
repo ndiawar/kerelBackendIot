@@ -24,7 +24,7 @@
     "express-handlebars": "^8.0.1",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.9.5",
+    "mongoose": "^8.10.0",
     "node-cron": "^3.0.3",
     "pug": "^3.0.3",
     "ssh2": "^1.16.0",
